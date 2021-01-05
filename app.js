@@ -1,4 +1,5 @@
 const path = require('path');
+
 const express = require('express');
 const bodyParser = require('body-parser');
 const mongoose = require('mongoose');
@@ -9,6 +10,8 @@ const graphqlHttp = require('express-graphql');
 // const authRoutes = require('./routes/auth');
 const graphqlSchema = require('./graphql/schema');
 const graphqlResolver = require('./graphql/resolvers');
+const auth = require('./middleware/auth');
+const { clearImage } = require('./util/file');
 
 const MongoDb_uri = "mongodb+srv://node:bVarJkbh4P3zhCBR@nodejs-cs7gj.mongodb.net/feeds";
 
@@ -53,6 +56,22 @@ app.use((req, res, next) => {
 
 // app.use('/feed', feedRoutes);
 // app.use('/auth', authRoutes);
+app.use(auth);
+
+app.put('/post-image', (req, res, next) => {
+  if (!req.isAuth) {
+    throw new Error('Not authenticated!');
+  }
+  if (!req.file) {
+    return res.status(200).json({ message: 'No file provided!' });
+  }
+  if (req.body.oldPath) {
+    clearImage(req.body.oldPath);
+  }
+  return res
+    .status(201)
+    .json({ message: 'File stored.', filePath: req.file.path });
+});
 
 app.use('/graphql', graphqlHttp({
 	schema: graphqlSchema,
@@ -77,7 +96,7 @@ app.use((error, req, res, next) => {
   res.status(status).json({ message: message });
 });
 
-mongoose.connect(MongoDb_uri, {useUnifiedTopology: true, useNewUrlParser: true })
+mongoose.connect(MongoDb_uri, {useUnifiedTopology: true, useNewUrlParser: true, useCreateIndex: true })
 	.then(result => {
 		app.listen(8080);
 		console.log('Client connected');
